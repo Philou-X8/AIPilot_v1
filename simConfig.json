@@ -1,0 +1,11 @@
+{
+  "allied": "../bin/Debug/net6.0/AIPProvider.dll",
+  "enemy": "../bin/Debug/net6.0/AIPProvider.dll",
+  "map": "../../Maps/Archipel/",
+  "debugAllied": true,
+  "debugEnemy": false,
+  "alliedCount": 1,
+  "enemyCount": 5,
+  "spawnDist": 10000,
+  "spawnAlt": 1000
+}
