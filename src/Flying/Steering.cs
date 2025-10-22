@@ -65,7 +65,7 @@ namespace AIPProvider.src.Flying
             //utils.Graph("dir x", direction.x);
             //utils.Graph("dir y", direction.y);
             //utils.Graph("dir z", direction.z);
-            direction.x = -direction.x; // make X positive on the right 
+            direction.x = -direction.x; // X axis is fliped, unflip to make X positive on the right 
             float pitch = GetPitch(new Vector2(direction.z, direction.y));
             float roll  =  GetRoll(new Vector2(direction.x, direction.y));
             float yaw   =   GetYaw(new Vector2(direction.x, direction.z));
@@ -119,7 +119,7 @@ namespace AIPProvider.src.Flying
             //}
             if (
                 (y < -MathF.Abs(x))
-                && (xy.magnitude < 0.5f)
+                && (xy.magnitude < 0.3f)
                 )
             {
                 // inverted roll zone
