@@ -17,7 +17,7 @@ namespace AIPProvider.src.Flying
 
         const float SMOOTH_TURN_MIN = 10000f;
         const float SMOOTH_TURN_MAX = 50000f;
-        const float PITCH_MULT = 4f;
+        const float PITCH_MULT = 8f;
         const float ROLL_MULT= 4f;
         const float YAW_MULT = 8f;
 
@@ -84,7 +84,7 @@ namespace AIPProvider.src.Flying
             if (
                 ( (MathF.Abs(z) + MathF.Abs(y) < 1) // inner diamond
                 && (y < -MathF.Abs(z)) ) // lower 45deg
-                || (zy.magnitude < 0.2f) // small inner circle
+                || (zy.magnitude < 0.2f) // small inner circle // when rolling
                 )
             {
                 // neutral zone, dont pitch

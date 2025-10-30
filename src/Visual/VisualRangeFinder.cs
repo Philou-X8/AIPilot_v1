@@ -92,7 +92,7 @@ namespace AIPProvider.src.Visual
                 summedDist += -closure * Time.fixedDeltaTime;
             }
 
-            if (summedDist > MAX_RANGE) summedDist = MAX_RANGE;
+            summedDist = Math.Clamp(summedDist, 0, MAX_RANGE);
 
             lastDir = dir;
             lastOrigin = ownPos;

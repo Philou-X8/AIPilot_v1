@@ -10,9 +10,13 @@ namespace AIPProvider.src.Utilities
 {
     internal class ColorMap
     {
+        public static NetColor Convert(Vector3 color)
+        {
+            return new NetColor(color.x/255f, color.y/255f, color.z/255f, 1.0f);
+        }
 
         public static Vector3 RadarSpot => new Vector3(166, 36, 108);
-        public static Vector3 RadarGuide => new Vector3(227, 25, 89);
+        public static Vector3 RadarGuide => new Vector3(237, 119, 156);
 
         public static Vector3 RwrPing => new Vector3(123, 55, 148);
         public static Vector3 RwrLock => new Vector3(187, 0, 255);
