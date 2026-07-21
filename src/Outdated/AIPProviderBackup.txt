@@ -1,0 +1,234 @@
+using AIPProvider.src;
+using AIPProvider.src.Outdated;
+using AIPProvider.src.Radar;
+using AIPProvider.src.Radar.STT;
+using AIPProvider.src.Radar.TWS;
+using AIPProvider.src.RWR;
+using AIPProvider.src.SensorFusion;
+using AIPProvider.src.Terrain;
+using AIPProvider.src.Utilities;
+using AIPProvider.src.Visual;
+using Recorder;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Loader;
+using System.Xml.Linq;
+using UnityGERunner;
+using UnityGERunner.UnityApplication;
+using static AIPLoader.AIPProviderOld;
+
+namespace AIPLoader
+{
+    class AIPProviderOld : IAIPProvider
+    {
+        private OutboundState state;
+        private InboundState output;
+
+        private Utils utils;
+        private GroundUtils gUtils;
+
+        // data classes
+        private ActiveDataCollector activeTracker;
+        private PassiveDataManager passiveTracker;
+        private ControllerTWS radarTWS;
+        private DeathHistory deads;
+        private ControllerRWR rwr;
+
+        // manouveur classes
+        private Navigation flyNavigation;
+        private Dogfight flyDogfight;
+
+        // combat instruments
+        private GunFunnel gun;
+
+        // debugging and others
+        private PathPredict pathPredict;
+
+        private Transform currentPos;
+
+        private bool isRadarOff;
+
+        public DetectionTest terrain;
+        //private Ratting ratPath;
+        //public delegate bool LinecastDel<NetVector>(NetVector a, NetVector b, out NetVector collisionPoint); // TEMP testing
+
+        private VisualSpotter visual;
+        private AirstManager airst;
+
+        //---------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------
+        public override SetupActions Start(SetupInfo info)
+        {
+            //LinecastDel<NetVector> linecast = Linecast; // TEMP testing
+            //terrain = new DetectionTest(Linecast); // TEMP testing
+
+            utils = new Utils(info, Log, DebugShape, DebugShape, RemoveDebugShape, Graph);
+            gUtils = new GroundUtils(Linecast, HeightAt);
+
+            activeTracker = new ActiveDataCollector(utils);
+            passiveTracker = new PassiveDataManager(utils);
+            radarTWS = new ControllerTWS(utils);
+            deads = new DeathHistory(utils);
+            rwr = new ControllerRWR(utils);
+
+            flyNavigation = new Navigation(utils, gUtils);
+            flyDogfight = new Dogfight(utils);
+
+            gun = new GunFunnel(utils);
+
+            pathPredict = new PathPredict(utils);
+
+            terrain = new DetectionTest(utils, Linecast, HeightAt);
+            //ratPath = new Ratting(utils, gUtils);
+            visual = new VisualSpotter(utils);
+            airst = new AirstManager(utils);
+
+            //radarController = new RadarController(utils);
+            currentPos = new Transform();
+
+            isRadarOff = true;
+
+
+            Log("map: " + info.mapPath);
+
+            return new SetupActions
+            {
+                hardpoints = utils.hardpoint.MakeHardpointList(),
+                name = "id_" + info.id.ToString(),
+            };
+
+        }
+        private int counter = -10;
+        public override InboundState Update(OutboundState state)
+        {
+            this.state = state;
+            output = new InboundState
+            {
+                pyr = new NetVector { x = 0, y = 0, z = 0 },
+                throttle = 100,
+            };
+
+            currentPos.position = state.kinematics.position;
+            currentPos.rotation = state.kinematics.rotation;
+
+            gun.Update(state);
+
+            //List<int> radarAction = radarController.Update(state);
+            //actions.AddRange(radarAction);
+
+            List<int> deaths = deads.Deaths(state);
+            visual.RemoveDead(deaths);
+            passiveTracker.RemoveDead(deaths);
+
+            //if(utils.IsAllied(Team.Allied))
+            //{
+            //    output = RunUpdate(deaths);
+            //}
+            //else
+            //{
+            //    output = flyNavigation.Update(state);
+
+            //    visual.Update(state);
+            //    if (visual.ShouldGpull(out Vector3 pyr))
+            //    {
+            //        output.pyr = pyr;
+            //        //output.pyr = new Vector3(-1, 0.5f, -0.2f);
+            //    }
+
+            //    output.throttle = 100;
+            //}
+
+            output = RunUpdate(deaths);
+
+            rwr.Update(state);
+
+            //terrain.Update(state);
+            //ratPath.Update(state, flyNavigation.GetWaypoint());
+
+            if (counter == 1)
+            {
+                //utils.Log("WEAPONG LIST-------------------");
+                foreach (string weap in state.weapons)
+                {
+                    //utils.Log(weap);
+                }
+            }
+            counter++;
+
+            //}
+            //counter++;
+
+            return output;
+        }
+        //---------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------
+
+        private InboundState RunUpdate(List<int> deaths)
+        {
+            List<int> outActions = new List<int>();
+            float outThrottle = 100;
+            Vector3 outPYR = new Vector3();
+            Vector3 lookDir = new Vector3();
+
+            if (isRadarOff)
+            {
+                outActions.Add((int)InboundAction.RadarState);
+                outActions.Add(1);
+                outActions.Add((int)InboundAction.SetUncage);
+                outActions.Add(1);
+
+                isRadarOff = false;
+            }
+
+            // collect data
+            outActions.AddRange( radarTWS.Update(state, deaths) );
+
+
+            // update data
+            List<ActivePassiveCarrier> tracks = activeTracker.GetTracks(state);
+            passiveTracker.UpdateFromActive(tracks);
+            List<VisualPassiveCarrier> vis = visual.Update(state);
+            passiveTracker.UpdateFromVisual(vis);
+            passiveTracker.Update(state);
+
+            // make decision
+            //int targetId = passiveTracker.GetNearest(currentPos, state.time);
+            passiveTracker.NearestWaypoint(currentPos, state.kinematics.velocity, state.time, out int targetId, out Vector3 checkpoint);
+            if (targetId > 0 && (checkpoint - state.kinematics.position).magnitude < 10000)
+            {
+                flyNavigation.ForceWaypoint(checkpoint);
+
+                lookDir = airst.TryFireAt(state, passiveTracker.LocationOfId(targetId, state.time), ref outActions);
+
+
+                //outActions.AddRange( radarTWS.AttackTarget(state, targetId) ); // fire missile
+            }
+            List<GuidanceParameter> rdrMissileQueue = passiveTracker.GetMissileQueue(state.time, state.kinematics.position);
+            radarTWS.AddMissileTargets(rdrMissileQueue);
+
+            //if (state.time > 2 && state.time < 15)
+            //outActions.AddRange(testTWS.Update(state, 2));
+
+            // fly 
+            InboundState navControls = flyNavigation.Update(state);
+            outPYR = navControls.pyr;
+            if (visual.ShouldGpull(out Vector3 pyr))
+            {
+                outPYR = pyr;
+                //output.pyr = new Vector3(-1, 0.5f, -0.2f);
+            }
+
+
+            return new InboundState
+            {
+                pyr = outPYR,
+                throttle = outThrottle,
+                events = outActions.ToArray(),
+                irLookDir = lookDir,
+            };
+        }
+    }
+}

@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 using UnityGERunner;
 using UnityGERunner.UnityApplication;
 
-namespace AIPProvider.src.Utilities
+namespace AIPProvider.src.Utilities.Settings
 {
     internal class ColorMap
     {
         public static NetColor Convert(Vector3 color)
         {
-            return new NetColor(color.x/255f, color.y/255f, color.z/255f, 1.0f);
+            return new NetColor(color.x / 255f, color.y / 255f, color.z / 255f, 1.0f);
         }
 
         public static Vector3 RadarSpot => new Vector3(166, 36, 108);
